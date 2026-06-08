@@ -1,0 +1,29 @@
+video:
+  input: data/input.mp4
+  analysis_width: 320
+
+preprocess:
+  enabled: true
+  output: output/preprocessed.mp4
+  fps: 1.0
+  height: 320
+  video_codec: libx264
+  preset: veryfast
+  crf: 28
+  pixel_format: yuv420p
+  overwrite: true
+
+output:
+  json: output/timeline.json
+
+render:
+  timeline_json: output/timeline.json
+  output_video: output/replay.mp4
+  fps: 30.0
+  video_codec: libx264
+  quality: 7
+  overlay:
+    enabled: true
+    margin: 16
+    font_scale: 0.8
+    thickness: 2

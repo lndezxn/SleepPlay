@@ -1,0 +1,41 @@
+output_root: data/dev/videos
+generate_pipeline_configs: true
+pipeline_config_root: data/dev/configs
+pipeline_output_root: data/dev/output
+
+defaults:
+  width: 640
+  height: 360
+  fps: 10.0
+  codec: mp4v
+
+short_cases:
+  - name: still
+    kind: still
+    duration_seconds: 12
+  - name: slow_square
+    kind: slow_square
+    duration_seconds: 12
+  - name: fast_square
+    kind: fast_square
+    duration_seconds: 12
+  - name: burst_motion
+    kind: burst_motion
+    duration_seconds: 12
+  - name: size_change
+    kind: size_change
+    duration_seconds: 12
+  - name: scene_noise
+    kind: scene_noise
+    duration_seconds: 12
+
+long_cases:
+  - name: long_still_1h
+    kind: still
+    duration_seconds: 3600
+  - name: long_periodic_motion_1h
+    kind: periodic_motion
+    duration_seconds: 3600
+  - name: long_continuous_motion_1h
+    kind: continuous_motion
+    duration_seconds: 3600

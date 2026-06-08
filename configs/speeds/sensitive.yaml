@@ -1,0 +1,8 @@
+speed:
+  type: sensitive
+  still_score: 1.0
+  motion_score: 5.0
+  min_speed: 1.0
+  max_speed: 60.0
+  sensitivity: 4.0
+  smoothing_window: 5

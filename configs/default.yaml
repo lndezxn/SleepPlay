@@ -1,0 +1,4 @@
+includes:
+  - app/default.yaml
+  - scores/frame_diff.yaml
+  - speeds/sensitive.yaml
