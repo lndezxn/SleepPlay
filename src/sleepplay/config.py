@@ -48,6 +48,14 @@ class RenderConfig:
 
 
 @dataclass(frozen=True)
+class WebConfig:
+    host: str
+    port: int
+    storage_root: Path
+    max_workers: int
+
+
+@dataclass(frozen=True)
 class ScoreConfig:
     type: str
     params: dict[str, Any] = field(default_factory=dict)
@@ -70,6 +78,7 @@ class AppConfig:
     preprocess: PreprocessConfig
     output: OutputConfig
     render: RenderConfig
+    web: WebConfig
     score: ScoreConfig
     speed: SpeedConfig
 
@@ -85,6 +94,7 @@ def load_config(path: Path) -> AppConfig:
     preprocess = data["preprocess"]
     output = data["output"]
     render = data["render"]
+    web = data["web"]
     score = data["score"]
     speed = data["speed"]
 
@@ -117,6 +127,12 @@ def load_config(path: Path) -> AppConfig:
                 font_scale=float(render["overlay"]["font_scale"]),
                 thickness=int(render["overlay"]["thickness"]),
             ),
+        ),
+        web=WebConfig(
+            host=str(web["host"]),
+            port=int(web["port"]),
+            storage_root=Path(str(web["storage_root"])),
+            max_workers=int(web["max_workers"]),
         ),
         score=ScoreConfig(
             type=str(score["type"]),

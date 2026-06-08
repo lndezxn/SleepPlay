@@ -25,5 +25,11 @@ render:
   overlay:
     enabled: true
     margin: 16
-    font_scale: 0.8
-    thickness: 2
+    font_scale: 0.55
+    thickness: 1
+
+web:
+  host: 127.0.0.1
+  port: 8000
+  storage_root: data/web/jobs
+  max_workers: 1

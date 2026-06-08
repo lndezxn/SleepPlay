@@ -7,6 +7,7 @@ import numpy as np
 from rich.progress import Progress
 
 from sleepplay.config import RenderConfig, RenderOverlayConfig
+from sleepplay.progress import ProgressReporter, report_progress
 from sleepplay.timeline import Timeline, read_timeline
 
 
@@ -18,7 +19,10 @@ class ReplaySegment:
     output_frame_count: int
 
 
-def render_replay_video(config: RenderConfig) -> None:
+def render_replay_video(
+    config: RenderConfig,
+    progress_reporter: ProgressReporter | None = None,
+) -> None:
     timeline = read_timeline(config.timeline_json)
     segments = build_replay_segments(timeline, output_fps=config.fps)
     source_path = Path(timeline.video)
@@ -55,28 +59,73 @@ def render_replay_video(config: RenderConfig) -> None:
 
         try:
             total_frames = sum(segment.output_frame_count for segment in segments)
-            with Progress() as progress:
-                task = progress.add_task("Rendering replay", total=total_frames)
-                for segment in segments:
-                    for output_frame_index in range(segment.output_frame_count):
-                        source_time = source_time_for_output_frame(
-                            segment,
-                            output_frame_index,
-                            config.fps,
-                        )
-                        source_frame = frame_reader.read(source_time)
-                        overlayed_frame = draw_speed_overlay(
-                            source_frame,
-                            segment.replay_speed,
-                            config.overlay,
-                        )
-                        rgb_frame = cv2.cvtColor(overlayed_frame, cv2.COLOR_BGR2RGB)
-                        writer.send(np.ascontiguousarray(rgb_frame))
-                        progress.advance(task)
+            report_progress(progress_reporter, "render", 0.0, "Rendering replay")
+            if progress_reporter is None:
+                with Progress() as progress:
+                    task = progress.add_task("Rendering replay", total=total_frames)
+                    render_segments(
+                        segments,
+                        config,
+                        frame_reader,
+                        writer,
+                        progress,
+                        task,
+                        None,
+                        total_frames,
+                    )
+            else:
+                render_segments(
+                    segments,
+                    config,
+                    frame_reader,
+                    writer,
+                    None,
+                    None,
+                    progress_reporter,
+                    total_frames,
+                )
+            report_progress(progress_reporter, "render", 1.0, "Replay render complete")
         finally:
             writer.close()
     finally:
         capture.release()
+
+
+def render_segments(
+    segments: list[ReplaySegment],
+    config: RenderConfig,
+    frame_reader: "SourceFrameReader",
+    writer: object,
+    progress: Progress | None,
+    task: object,
+    progress_reporter: ProgressReporter | None,
+    total_frames: int,
+) -> None:
+    rendered_frames = 0
+    for segment in segments:
+        for output_frame_index in range(segment.output_frame_count):
+            source_time = source_time_for_output_frame(
+                segment,
+                output_frame_index,
+                config.fps,
+            )
+            source_frame = frame_reader.read(source_time)
+            overlayed_frame = draw_speed_overlay(
+                source_frame,
+                segment.replay_speed,
+                config.overlay,
+            )
+            rgb_frame = cv2.cvtColor(overlayed_frame, cv2.COLOR_BGR2RGB)
+            writer.send(np.ascontiguousarray(rgb_frame))
+            rendered_frames += 1
+            if progress is not None:
+                progress.advance(task)
+            report_progress(
+                progress_reporter,
+                "render",
+                rendered_frames / total_frames,
+                "Rendering replay",
+            )
 
 
 def build_replay_segments(timeline: Timeline, output_fps: float) -> list[ReplaySegment]:

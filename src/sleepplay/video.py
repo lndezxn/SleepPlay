@@ -5,6 +5,8 @@ import cv2
 import numpy as np
 from rich.progress import Progress
 
+from sleepplay.progress import ProgressReporter, report_progress
+
 
 @dataclass(frozen=True)
 class VideoFrame:
@@ -18,7 +20,12 @@ class VideoFrames:
     frames: list[VideoFrame]
 
 
-def read_video_frames(path: Path) -> VideoFrames:
+def read_video_frames(
+    path: Path,
+    progress_reporter: ProgressReporter | None = None,
+    progress_start: float = 0.0,
+    progress_end: float = 1.0,
+) -> VideoFrames:
     if not path.exists():
         raise FileNotFoundError(path)
 
@@ -33,8 +40,18 @@ def read_video_frames(path: Path) -> VideoFrames:
             raise RuntimeError("Video must expose positive FPS and frame count metadata.")
 
         frames: list[VideoFrame] = []
-        with Progress() as progress:
-            task = progress.add_task("Reading frames", total=frame_count)
+        if progress_reporter is None:
+            with Progress() as progress:
+                task = progress.add_task("Reading frames", total=frame_count)
+                frame_index = 0
+                while True:
+                    success, frame = capture.read()
+                    if not success:
+                        break
+                    frames.append(VideoFrame(time=frame_index / fps, frame=frame))
+                    frame_index += 1
+                    progress.advance(task)
+        else:
             frame_index = 0
             while True:
                 success, frame = capture.read()
@@ -42,10 +59,19 @@ def read_video_frames(path: Path) -> VideoFrames:
                     break
                 frames.append(VideoFrame(time=frame_index / fps, frame=frame))
                 frame_index += 1
-                progress.advance(task)
+                report_progress(
+                    progress_reporter,
+                    "timeline",
+                    ranged_progress(frame_index / frame_count, progress_start, progress_end),
+                    "Reading analysis frames",
+                )
 
         if not frames:
             raise RuntimeError(f"Video did not contain readable frames: {path}")
         return VideoFrames(frame_interval_seconds=1.0 / fps, frames=frames)
     finally:
         capture.release()
+
+
+def ranged_progress(progress: float, start: float, end: float) -> float:
+    return start + (end - start) * progress

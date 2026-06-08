@@ -36,6 +36,11 @@ render:
     margin: 16
     font_scale: 0.8
     thickness: 2
+web:
+  host: 127.0.0.1
+  port: 8000
+  storage_root: data/web/jobs
+  max_workers: 1
 """,
         encoding="utf-8",
     )
@@ -95,6 +100,10 @@ video:
     assert config.render.overlay.margin == 16
     assert config.render.overlay.font_scale == 0.8
     assert config.render.overlay.thickness == 2
+    assert config.web.host == "127.0.0.1"
+    assert config.web.port == 8000
+    assert config.web.storage_root == Path("data/web/jobs")
+    assert config.web.max_workers == 1
     assert config.score.type == "frame_diff"
     assert config.score.params == {}
     assert config.speed.type == "sensitive"
