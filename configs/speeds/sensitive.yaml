@@ -5,4 +5,5 @@ speed:
   min_speed: 1.0
   max_speed: 60.0
   sensitivity: 4.0
+  pooling_window: 3
   smoothing_window: 5

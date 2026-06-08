@@ -29,6 +29,7 @@ def test_pipeline_writes_time_score_and_replay_speed(tmp_path: Path) -> None:
     data = json.loads(output_path.read_text(encoding="utf-8"))
 
     assert data["video"] == str(video_path)
+    assert data["render_video"] == str(tmp_path / "render_source.mp4")
     assert data["frame_interval_seconds"] == 1.0
     assert len(data["records"]) == 3
     assert set(data["records"][0]) == {"time", "score", "replay_speed"}

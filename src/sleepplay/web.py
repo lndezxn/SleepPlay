@@ -22,6 +22,7 @@ from sleepplay.service import (
     write_resolved_config,
 )
 from sleepplay.timeline import read_timeline
+from sleepplay.video import video_fps
 
 Processor = Callable[[AppConfig, ProgressReporter | None], ProcessingResult]
 
@@ -151,13 +152,15 @@ def create_app(
         analysis_width: int | None = Form(None),
         preprocess_fps: float | None = Form(None),
         preprocess_height: int | None = Form(None),
-        render_fps: float | None = Form(None),
+        render_source: str | None = Form(None),
+        render_source_fps: float | None = Form(None),
         speed_type: str | None = Form(None),
         still_score: float | None = Form(None),
         motion_score: float | None = Form(None),
         min_speed: float | None = Form(None),
         max_speed: float | None = Form(None),
         sensitivity: float | None = Form(None),
+        pooling_window: int | None = Form(None),
         smoothing_window: int | None = Form(None),
     ) -> dict[str, str]:
         job = manager.create_job(
@@ -166,7 +169,8 @@ def create_app(
                 analysis_width=analysis_width,
                 preprocess_fps=preprocess_fps,
                 preprocess_height=preprocess_height,
-                render_fps=render_fps,
+                render_source=render_source,
+                render_source_fps=render_source_fps,
                 score_type=score_type,
                 speed_type=speed_type,
                 still_score=still_score,
@@ -174,6 +178,7 @@ def create_app(
                 min_speed=min_speed,
                 max_speed=max_speed,
                 sensitivity=sensitivity,
+                pooling_window=pooling_window,
                 smoothing_window=smoothing_window,
             ),
         )
@@ -218,9 +223,10 @@ def create_app(
         if not job.timeline_path.exists():
             raise HTTPException(status_code=404, detail="Timeline is not ready")
         timeline = read_timeline(job.timeline_path)
-        segments = build_replay_scale(timeline, output_fps=job.config.render.fps)
+        output_fps = video_fps(Path(timeline.render_video))
+        segments = build_replay_scale(timeline, output_fps=output_fps)
         return {
-            "output_fps": job.config.render.fps,
+            "output_fps": output_fps,
             "total_source_seconds": segments[-1].source_end,
             "total_replay_seconds": segments[-1].replay_end,
             "segments": [asdict(segment) for segment in segments],
@@ -246,13 +252,15 @@ def web_settings(config: AppConfig) -> dict[str, object]:
         "analysis_width": config.video.analysis_width,
         "preprocess_fps": config.preprocess.fps,
         "preprocess_height": config.preprocess.height,
-        "render_fps": config.render.fps,
+        "render_source": config.render.source,
+        "render_source_fps": config.render.source_fps,
         "speed_type": config.speed.type,
         "still_score": config.speed.still_score,
         "motion_score": config.speed.motion_score,
         "min_speed": config.speed.min_speed,
         "max_speed": config.speed.max_speed,
         "sensitivity": config.speed.sensitivity,
+        "pooling_window": config.speed.pooling_window,
         "smoothing_window": config.speed.smoothing_window,
     }
 
@@ -980,9 +988,16 @@ WEB_HTML = """
                 <label for="preprocess-fps">Preprocess FPS</label>
                 <input id="preprocess-fps" name="preprocess_fps" form="upload-form" type="number" min="0.1" step="0.1">
               </div>
+              <div class="settings-field full">
+                <label for="render-source">Render source</label>
+                <select id="render-source" name="render_source" form="upload-form">
+                  <option value="preprocessed">Preprocessed</option>
+                  <option value="original">Original</option>
+                </select>
+              </div>
               <div class="settings-field">
-                <label for="render-fps">Render FPS</label>
-                <input id="render-fps" name="render_fps" form="upload-form" type="number" min="1" step="1">
+                <label for="render-source-fps">Source FPS</label>
+                <input id="render-source-fps" name="render_source_fps" form="upload-form" type="number" min="0.1" step="0.1">
               </div>
             </div>
           </section>
@@ -1015,6 +1030,10 @@ WEB_HTML = """
               <div class="settings-field">
                 <label for="sensitivity">Sensitivity</label>
                 <input id="sensitivity" name="sensitivity" form="upload-form" type="number" min="0.1" step="0.1">
+              </div>
+              <div class="settings-field">
+                <label for="pooling-window">Pooling</label>
+                <input id="pooling-window" name="pooling_window" form="upload-form" type="number" min="1" step="1">
               </div>
               <div class="settings-field">
                 <label for="smoothing-window">Smoothing</label>

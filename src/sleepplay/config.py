@@ -41,7 +41,9 @@ class RenderOverlayConfig:
 class RenderConfig:
     timeline_json: Path
     output_video: Path
-    fps: float
+    source: str
+    source_video: Path
+    source_fps: float
     video_codec: str
     quality: int
     overlay: RenderOverlayConfig
@@ -69,6 +71,7 @@ class SpeedConfig:
     min_speed: float
     max_speed: float
     sensitivity: float
+    pooling_window: int
     smoothing_window: int
 
 
@@ -118,7 +121,9 @@ def load_config(path: Path) -> AppConfig:
         render=RenderConfig(
             timeline_json=Path(str(render["timeline_json"])),
             output_video=Path(str(render["output_video"])),
-            fps=float(render["fps"]),
+            source=str(render["source"]),
+            source_video=Path(str(render["source_video"])),
+            source_fps=float(render["source_fps"]),
             video_codec=str(render["video_codec"]),
             quality=int(render["quality"]),
             overlay=RenderOverlayConfig(
@@ -145,6 +150,7 @@ def load_config(path: Path) -> AppConfig:
             min_speed=float(speed["min_speed"]),
             max_speed=float(speed["max_speed"]),
             sensitivity=float(speed["sensitivity"]),
+            pooling_window=int(speed["pooling_window"]),
             smoothing_window=int(speed["smoothing_window"]),
         ),
     )

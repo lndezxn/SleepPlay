@@ -82,6 +82,25 @@ preprocess:
   height: 320
 ```
 
+Replay rendering also uses a preprocessed video by default. This keeps long 4K
+videos practical because the renderer reads a low-resolution source instead of
+seeking through the original file for every output frame. The render source uses
+the configured `preprocess.height` for resolution and `render.source_fps` for
+frame rate:
+
+```yaml
+render:
+  source: preprocessed
+  source_video: output/render_source.mp4
+  source_fps: 15.0
+```
+
+The final replay video is written at the render source video's actual frame
+rate. SleepPlay does not apply a separate output FPS conversion during render.
+
+Set `render.source` to `original` when you specifically want to render from the
+full-resolution input video.
+
 ## Commands
 
 Generate replay metadata:
@@ -95,6 +114,7 @@ The command writes a JSON file with one record per preprocessed video frame:
 ```json
 {
   "video": "data/input.mp4",
+  "render_video": "output/render_source.mp4",
   "frame_interval_seconds": 1.0,
   "records": [
     {
@@ -138,13 +158,16 @@ speed:
   still_score: 1.0
   motion_score: 5.0
   sensitivity: 4.0
+  pooling_window: 3
   smoothing_window: 3
 ```
 
 Increase `sensitivity` or lower `motion_score` to slow down more aggressively
-when small movement appears. Increase `smoothing_window` to smooth noisy scores
-before mapping them to replay speed; smoothing uses the whole score series, so a
-record's speed can reflect nearby movement.
+when small movement appears. `pooling_window` applies a sliding max over scores
+before smoothing, so short motion can affect nearby records. Increase
+`smoothing_window` to smooth the pooled scores before mapping them to replay
+speed; smoothing uses the whole score series, so a record's speed can reflect
+nearby movement.
 
 ## Development Fixtures
 

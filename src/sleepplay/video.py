@@ -75,3 +75,16 @@ def read_video_frames(
 
 def ranged_progress(progress: float, start: float, end: float) -> float:
     return start + (end - start) * progress
+
+
+def video_fps(path: Path) -> float:
+    capture = cv2.VideoCapture(str(path))
+    if not capture.isOpened():
+        raise RuntimeError(f"Could not open video: {path}")
+    try:
+        fps = float(capture.get(cv2.CAP_PROP_FPS))
+        if fps <= 0.0:
+            raise RuntimeError("Video must expose positive FPS metadata.")
+        return fps
+    finally:
+        capture.release()

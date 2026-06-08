@@ -7,6 +7,7 @@ def test_still_score_maps_to_max_speed() -> None:
         motion_score=22.0,
         min_speed=1.0,
         max_speed=16.0,
+        pooling_window=1,
         smoothing_window=1,
     )
 
@@ -19,6 +20,7 @@ def test_motion_score_maps_to_min_speed() -> None:
         motion_score=22.0,
         min_speed=1.0,
         max_speed=16.0,
+        pooling_window=1,
         smoothing_window=1,
     )
 
@@ -31,6 +33,7 @@ def test_middle_score_interpolates_linearly() -> None:
         motion_score=22.0,
         min_speed=1.0,
         max_speed=16.0,
+        pooling_window=1,
         smoothing_window=1,
     )
 
@@ -43,6 +46,7 @@ def test_scores_clamp_to_speed_bounds() -> None:
         motion_score=22.0,
         min_speed=1.0,
         max_speed=16.0,
+        pooling_window=1,
         smoothing_window=1,
     )
 
@@ -56,6 +60,7 @@ def test_sensitive_mapper_slows_down_small_motion_more_than_linear() -> None:
         motion_score=10.0,
         min_speed=1.0,
         max_speed=16.0,
+        pooling_window=1,
         smoothing_window=1,
     )
     sensitive_mapper = SensitiveSpeedMapper(
@@ -63,6 +68,7 @@ def test_sensitive_mapper_slows_down_small_motion_more_than_linear() -> None:
         motion_score=10.0,
         min_speed=1.0,
         max_speed=16.0,
+        pooling_window=1,
         smoothing_window=1,
         sensitivity=4.0,
     )
@@ -76,6 +82,7 @@ def test_mapper_smooths_score_series_before_mapping() -> None:
         motion_score=12.0,
         min_speed=1.0,
         max_speed=13.0,
+        pooling_window=1,
         smoothing_window=1,
     )
     smoothed_mapper = LinearSpeedMapper(
@@ -83,6 +90,7 @@ def test_mapper_smooths_score_series_before_mapping() -> None:
         motion_score=12.0,
         min_speed=1.0,
         max_speed=13.0,
+        pooling_window=1,
         smoothing_window=3,
     )
     context = SpeedContext(
@@ -93,3 +101,30 @@ def test_mapper_smooths_score_series_before_mapping() -> None:
 
     assert unsmoothed_mapper.map_scores(context) == [13.0, 1.0, 13.0]
     assert smoothed_mapper.map_scores(context) == [7.0, 9.0, 7.0]
+
+
+def test_mapper_max_pools_scores_before_smoothing() -> None:
+    pooled_mapper = LinearSpeedMapper(
+        still_score=0.0,
+        motion_score=12.0,
+        min_speed=1.0,
+        max_speed=13.0,
+        pooling_window=3,
+        smoothing_window=3,
+    )
+    smoothed_only_mapper = LinearSpeedMapper(
+        still_score=0.0,
+        motion_score=12.0,
+        min_speed=1.0,
+        max_speed=13.0,
+        pooling_window=1,
+        smoothing_window=3,
+    )
+    context = SpeedContext(
+        times=[0.0, 1.0, 2.0, 3.0, 4.0],
+        scores=[0.0, 0.0, 12.0, 0.0, 0.0],
+        frame_interval_seconds=1.0,
+    )
+
+    assert smoothed_only_mapper.map_scores(context) == [13.0, 9.0, 9.0, 9.0, 13.0]
+    assert pooled_mapper.map_scores(context) == [7.0, 5.0, 1.0, 5.0, 7.0]

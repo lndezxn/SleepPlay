@@ -24,12 +24,9 @@ def render_replay_video(
     progress_reporter: ProgressReporter | None = None,
 ) -> None:
     timeline = read_timeline(config.timeline_json)
-    segments = build_replay_segments(timeline, output_fps=config.fps)
-    source_path = Path(timeline.video)
+    source_path = Path(timeline.render_video)
     if not source_path.exists():
         raise FileNotFoundError(source_path)
-    if config.fps <= 0.0:
-        raise ValueError("render fps must be positive.")
 
     config.output_video.parent.mkdir(parents=True, exist_ok=True)
     capture = cv2.VideoCapture(str(source_path))
@@ -44,11 +41,12 @@ def render_replay_video(
         if source_fps <= 0.0 or source_frame_count <= 0 or width <= 0 or height <= 0:
             raise RuntimeError("Source video must expose valid metadata.")
 
+        segments = build_replay_segments(timeline, output_fps=source_fps)
         frame_reader = SourceFrameReader(capture, source_fps, source_frame_count)
         writer = imageio_ffmpeg.write_frames(
             str(config.output_video),
             size=(width, height),
-            fps=config.fps,
+            fps=source_fps,
             codec=config.video_codec,
             quality=config.quality,
             pix_fmt_in="rgb24",
@@ -66,6 +64,7 @@ def render_replay_video(
                     render_segments(
                         segments,
                         config,
+                        source_fps,
                         frame_reader,
                         writer,
                         progress,
@@ -77,6 +76,7 @@ def render_replay_video(
                 render_segments(
                     segments,
                     config,
+                    source_fps,
                     frame_reader,
                     writer,
                     None,
@@ -94,6 +94,7 @@ def render_replay_video(
 def render_segments(
     segments: list[ReplaySegment],
     config: RenderConfig,
+    output_fps: float,
     frame_reader: "SourceFrameReader",
     writer: object,
     progress: Progress | None,
@@ -102,12 +103,13 @@ def render_segments(
     total_frames: int,
 ) -> None:
     rendered_frames = 0
+    progress_interval = max(1, total_frames // 500)
     for segment in segments:
         for output_frame_index in range(segment.output_frame_count):
             source_time = source_time_for_output_frame(
                 segment,
                 output_frame_index,
-                config.fps,
+                output_fps,
             )
             source_frame = frame_reader.read(source_time)
             overlayed_frame = draw_speed_overlay(
@@ -120,12 +122,13 @@ def render_segments(
             rendered_frames += 1
             if progress is not None:
                 progress.advance(task)
-            report_progress(
-                progress_reporter,
-                "render",
-                rendered_frames / total_frames,
-                "Rendering replay",
-            )
+            if rendered_frames == total_frames or rendered_frames % progress_interval == 0:
+                report_progress(
+                    progress_reporter,
+                    "render",
+                    rendered_frames / total_frames,
+                    "Rendering replay",
+                )
 
 
 def build_replay_segments(timeline: Timeline, output_fps: float) -> list[ReplaySegment]:
@@ -242,7 +245,14 @@ class SourceFrameReader:
         if target_frame_index == self.cached_frame_index and self.cached_frame is not None:
             return self.cached_frame
 
-        if target_frame_index != self.cached_frame_index + 1:
+        if self.cached_frame_index < 0:
+            if target_frame_index != 0:
+                self.capture.set(cv2.CAP_PROP_POS_FRAMES, target_frame_index)
+        elif target_frame_index > self.cached_frame_index + 1:
+            for _ in range(target_frame_index - self.cached_frame_index - 1):
+                if not self.capture.grab():
+                    raise RuntimeError(f"Could not skip toward source frame {target_frame_index}.")
+        elif target_frame_index != self.cached_frame_index + 1:
             self.capture.set(cv2.CAP_PROP_POS_FRAMES, target_frame_index)
 
         success, frame = self.capture.read()

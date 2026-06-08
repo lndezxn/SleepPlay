@@ -320,6 +320,9 @@ def write_pipeline_config(
                 config.pipeline_output_root / "timelines" / f"{spec.name}.json"
             ),
             "output_video": str(config.pipeline_output_root / "replays" / f"{spec.name}.mp4"),
+            "source_video": str(
+                config.pipeline_output_root / "render_sources" / f"{spec.name}.mp4"
+            ),
         },
     }
     OmegaConf.save(

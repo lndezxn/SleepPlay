@@ -28,7 +28,9 @@ output:
 render:
   timeline_json: output/timeline.json
   output_video: output/replay.mp4
-  fps: 30.0
+  source: preprocessed
+  source_video: output/render_source.mp4
+  source_fps: 15.0
   video_codec: libx264
   quality: 7
   overlay:
@@ -60,6 +62,7 @@ speed:
   min_speed: 1.0
   max_speed: 16.0
   sensitivity: 4.0
+  pooling_window: 3
   smoothing_window: 3
 """,
         encoding="utf-8",
@@ -93,7 +96,9 @@ video:
     assert config.output.json == Path("output/timeline.json")
     assert config.render.timeline_json == Path("output/timeline.json")
     assert config.render.output_video == Path("output/replay.mp4")
-    assert config.render.fps == 30.0
+    assert config.render.source == "preprocessed"
+    assert config.render.source_video == Path("output/render_source.mp4")
+    assert config.render.source_fps == 15.0
     assert config.render.video_codec == "libx264"
     assert config.render.quality == 7
     assert config.render.overlay.enabled is True
@@ -112,4 +117,5 @@ video:
     assert config.speed.min_speed == 1.0
     assert config.speed.max_speed == 16.0
     assert config.speed.sensitivity == 4.0
+    assert config.speed.pooling_window == 3
     assert config.speed.smoothing_window == 3

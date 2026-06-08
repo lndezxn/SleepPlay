@@ -9,6 +9,7 @@ from sleepplay.progress import ProgressReporter, ProgressUpdate
 from sleepplay.service import ProcessingResult
 from sleepplay.timeline import Timeline, TimelineRecord, write_timeline
 from sleepplay.web import create_app
+from video_helpers import write_test_video
 
 
 def test_web_index_contains_upload_video_and_timelines(tmp_path: Path) -> None:
@@ -62,7 +63,11 @@ def test_web_index_contains_upload_video_and_timelines(tmp_path: Path) -> None:
     assert 'name="speed_type"' in response.text
     assert 'name="analysis_width"' in response.text
     assert 'name="preprocess_fps"' in response.text
-    assert 'name="render_fps"' in response.text
+    assert 'name="render_source"' in response.text
+    assert 'name="render_source_fps"' in response.text
+    assert 'name="pooling_window"' in response.text
+    assert '<option value="preprocessed">Preprocessed</option>' in response.text
+    assert '<option value="original">Original</option>' in response.text
     assert "hydrateSettings" in response.text
     assert "new FormData(form)" in response.text
     assert "__DEFAULT_SETTINGS__" not in response.text
@@ -99,13 +104,15 @@ def test_upload_creates_job_and_streams_progress(tmp_path: Path) -> None:
             "analysis_width": "64",
             "preprocess_fps": "2.0",
             "preprocess_height": "48",
-            "render_fps": "12.0",
+            "render_source": "original",
+            "render_source_fps": "8.0",
             "speed_type": "linear",
             "still_score": "0.5",
             "motion_score": "8.5",
             "min_speed": "1.5",
             "max_speed": "20.0",
             "sensitivity": "2.5",
+            "pooling_window": "7",
             "smoothing_window": "5",
         },
         files={"video": ("input.mp4", b"fake video bytes", "video/mp4")},
@@ -119,13 +126,16 @@ def test_upload_creates_job_and_streams_progress(tmp_path: Path) -> None:
     assert job_config.video.analysis_width == 64
     assert job_config.preprocess.fps == 2.0
     assert job_config.preprocess.height == 48
-    assert job_config.render.fps == 12.0
+    assert job_config.render.source == "original"
+    assert job_config.render.source_video == config.web.storage_root / job_id / "render_source.mp4"
+    assert job_config.render.source_fps == 8.0
     assert job_config.speed.type == "linear"
     assert job_config.speed.still_score == 0.5
     assert job_config.speed.motion_score == 8.5
     assert job_config.speed.min_speed == 1.5
     assert job_config.speed.max_speed == 20.0
     assert job_config.speed.sensitivity == 2.5
+    assert job_config.speed.pooling_window == 7
     assert job_config.speed.smoothing_window == 5
 
     payloads: list[dict[str, object]] = []
@@ -159,10 +169,10 @@ def test_upload_creates_job_and_streams_progress(tmp_path: Path) -> None:
     assert replay_response.status_code == 200
 
     schedule = schedule_response.json()
-    assert schedule["output_fps"] == 12.0
+    assert schedule["output_fps"] == 8.0
     assert schedule["total_source_seconds"] == 2.0
     assert schedule["total_replay_seconds"] == 1.5
-    assert schedule["segments"][0]["output_frame_count"] == 6
+    assert schedule["segments"][0]["output_frame_count"] == 4
 
 
 def fake_processor(
@@ -176,12 +186,19 @@ def fake_processor(
         config.output.json,
         Timeline(
             video=str(config.video.input),
+            render_video=str(config.render.source_video),
             frame_interval_seconds=1.0,
             records=[
                 TimelineRecord(time=0.0, score=0.0, replay_speed=2.0),
                 TimelineRecord(time=1.0, score=10.0, replay_speed=1.0),
             ],
         ),
+    )
+    write_test_video(
+        config.render.source_video,
+        fps=config.render.source_fps,
+        size=(32, 24),
+        values=(0, 20, 40, 60, 80, 100, 120, 140),
     )
     config.render.output_video.write_bytes(b"fake mp4")
     return ProcessingResult(

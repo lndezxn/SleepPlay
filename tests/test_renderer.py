@@ -5,6 +5,7 @@ import numpy as np
 
 from sleepplay.config import RenderConfig, RenderOverlayConfig
 from sleepplay.renderer import (
+    SourceFrameReader,
     build_replay_segments,
     draw_speed_overlay,
     render_replay_video,
@@ -17,6 +18,7 @@ def test_read_timeline_loads_written_json(tmp_path: Path) -> None:
     timeline_path = tmp_path / "timeline.json"
     timeline = Timeline(
         video=str(tmp_path / "input.mp4"),
+        render_video=str(tmp_path / "input.mp4"),
         frame_interval_seconds=1.0,
         records=[
             TimelineRecord(time=0.0, score=0.0, replay_speed=2.0),
@@ -32,6 +34,7 @@ def test_read_timeline_loads_written_json(tmp_path: Path) -> None:
 def test_build_replay_segments_uses_speed_and_final_interval() -> None:
     timeline = Timeline(
         video="input.mp4",
+        render_video="input.mp4",
         frame_interval_seconds=1.0,
         records=[
             TimelineRecord(time=0.0, score=0.0, replay_speed=2.0),
@@ -79,6 +82,7 @@ def test_render_replay_video_writes_mp4(tmp_path: Path) -> None:
         timeline_path,
         Timeline(
             video=str(video_path),
+            render_video=str(video_path),
             frame_interval_seconds=1.0,
             records=[
                 TimelineRecord(time=0.0, score=0.0, replay_speed=2.0),
@@ -91,7 +95,9 @@ def test_render_replay_video_writes_mp4(tmp_path: Path) -> None:
         RenderConfig(
             timeline_json=timeline_path,
             output_video=output_path,
-            fps=4.0,
+            source="preprocessed",
+            source_video=tmp_path / "render_source.mp4",
+            source_fps=2.0,
             video_codec="libx264",
             quality=7,
             overlay=RenderOverlayConfig(
@@ -106,6 +112,47 @@ def test_render_replay_video_writes_mp4(tmp_path: Path) -> None:
     capture = cv2.VideoCapture(str(output_path))
     try:
         assert capture.isOpened()
+        assert round(capture.get(cv2.CAP_PROP_FPS)) == 4
         assert int(capture.get(cv2.CAP_PROP_FRAME_COUNT)) > 0
     finally:
         capture.release()
+
+
+def test_source_frame_reader_skips_forward_without_seeking() -> None:
+    capture = FakeCapture(frame_count=5)
+    reader = SourceFrameReader(capture, source_fps=1.0, frame_count=5)
+
+    reader.read(0.0)
+    frame = reader.read(2.0)
+
+    assert capture.set_calls == []
+    assert capture.grab_calls == 1
+    assert int(frame[0, 0, 0]) == 2
+
+
+class FakeCapture:
+    def __init__(self, frame_count: int) -> None:
+        self.frame_count = frame_count
+        self.position = 0
+        self.set_calls: list[int] = []
+        self.grab_calls = 0
+
+    def set(self, property_id: int, value: int) -> bool:
+        assert property_id == cv2.CAP_PROP_POS_FRAMES
+        self.set_calls.append(value)
+        self.position = value
+        return True
+
+    def grab(self) -> bool:
+        if self.position >= self.frame_count:
+            return False
+        self.grab_calls += 1
+        self.position += 1
+        return True
+
+    def read(self) -> tuple[bool, np.ndarray]:
+        if self.position >= self.frame_count:
+            return False, np.zeros((1, 1, 3), dtype=np.uint8)
+        frame = np.full((1, 1, 3), self.position, dtype=np.uint8)
+        self.position += 1
+        return True, frame

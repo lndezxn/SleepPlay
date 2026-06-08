@@ -12,19 +12,23 @@ def preprocess_video(
     input_path: Path,
     config: PreprocessConfig,
     progress_reporter: ProgressReporter | None = None,
+    progress_start: float = 0.0,
+    progress_end: float = 1.0,
+    message: str = "Preprocessing video",
+    complete_message: str = "Preprocessing complete",
 ) -> Path:
     if not config.enabled:
-        report_progress(progress_reporter, "preprocess", 1.0, "Preprocessing skipped")
+        report_progress(
+            progress_reporter,
+            "preprocess",
+            progress_end,
+            "Preprocessing skipped",
+        )
         return input_path
-    if not input_path.exists():
-        raise FileNotFoundError(input_path)
-    if config.fps <= 0.0:
-        raise ValueError("preprocess fps must be positive.")
-    if config.height <= 0:
-        raise ValueError("preprocess height must be positive.")
+    validate_preprocess_input(input_path, config)
 
     config.output.parent.mkdir(parents=True, exist_ok=True)
-    report_progress(progress_reporter, "preprocess", 0.0, "Preprocessing video")
+    report_progress(progress_reporter, "preprocess", progress_start, message)
     overwrite_flag = "-y" if config.overwrite else "-n"
     video_filter = f"fps={config.fps},scale=-2:{config.height}"
     command = [
@@ -49,18 +53,109 @@ def preprocess_video(
         str(config.output),
     ]
 
-    result = run_ffmpeg_preprocess(command, input_path, progress_reporter)
+    result = run_ffmpeg_preprocess(
+        command,
+        input_path,
+        progress_reporter,
+        progress_start,
+        progress_end,
+        message,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg preprocessing failed:\n{result.stderr}")
+
+    report_progress(progress_reporter, "preprocess", progress_end, complete_message)
+    return config.output
+
+
+def preprocess_video_pair(
+    input_path: Path,
+    first_config: PreprocessConfig,
+    second_config: PreprocessConfig,
+    progress_reporter: ProgressReporter | None = None,
+    message: str = "Preprocessing videos",
+) -> tuple[Path, Path]:
+    validate_preprocess_input(input_path, first_config)
+    validate_preprocess_input(input_path, second_config)
+    if first_config.output == second_config.output:
+        raise ValueError("paired preprocess outputs must be different paths.")
+
+    first_config.output.parent.mkdir(parents=True, exist_ok=True)
+    second_config.output.parent.mkdir(parents=True, exist_ok=True)
+    report_progress(progress_reporter, "preprocess", 0.0, message)
+    overwrite_flag = "-y" if first_config.overwrite and second_config.overwrite else "-n"
+    filter_complex = (
+        "[0:v]split=2[first_in][second_in];"
+        f"[first_in]fps={first_config.fps},scale=-2:{first_config.height}[first_out];"
+        f"[second_in]fps={second_config.fps},scale=-2:{second_config.height}[second_out]"
+    )
+    command = [
+        imageio_ffmpeg.get_ffmpeg_exe(),
+        overwrite_flag,
+        "-nostats",
+        "-i",
+        str(input_path),
+        "-filter_complex",
+        filter_complex,
+        "-progress",
+        "pipe:1",
+        "-map",
+        "[first_out]",
+        "-an",
+        "-c:v",
+        first_config.video_codec,
+        "-preset",
+        first_config.preset,
+        "-crf",
+        str(first_config.crf),
+        "-pix_fmt",
+        first_config.pixel_format,
+        str(first_config.output),
+        "-map",
+        "[second_out]",
+        "-an",
+        "-c:v",
+        second_config.video_codec,
+        "-preset",
+        second_config.preset,
+        "-crf",
+        str(second_config.crf),
+        "-pix_fmt",
+        second_config.pixel_format,
+        str(second_config.output),
+    ]
+
+    result = run_ffmpeg_preprocess(
+        command,
+        input_path,
+        progress_reporter,
+        0.0,
+        1.0,
+        message,
+    )
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg preprocessing failed:\n{result.stderr}")
 
     report_progress(progress_reporter, "preprocess", 1.0, "Preprocessing complete")
-    return config.output
+    return first_config.output, second_config.output
+
+
+def validate_preprocess_input(input_path: Path, config: PreprocessConfig) -> None:
+    if not input_path.exists():
+        raise FileNotFoundError(input_path)
+    if config.fps <= 0.0:
+        raise ValueError("preprocess fps must be positive.")
+    if config.height <= 0:
+        raise ValueError("preprocess height must be positive.")
 
 
 def run_ffmpeg_preprocess(
     command: list[str],
     input_path: Path,
     progress_reporter: ProgressReporter | None,
+    progress_start: float,
+    progress_end: float,
+    message: str,
 ) -> subprocess.CompletedProcess[str]:
     if progress_reporter is None:
         return subprocess.run(
@@ -83,12 +178,14 @@ def run_ffmpeg_preprocess(
     for line in process.stdout:
         key, _, value = line.strip().partition("=")
         if key == "out_time":
+            if ":" not in value:
+                continue
             elapsed_seconds = parse_ffmpeg_time(value)
             report_progress(
                 progress_reporter,
                 "preprocess",
-                elapsed_seconds / duration_seconds,
-                "Preprocessing video",
+                ranged_progress(elapsed_seconds / duration_seconds, progress_start, progress_end),
+                message,
             )
 
     stderr = process.stderr.read()
@@ -122,3 +219,7 @@ def parse_ffmpeg_time(value: str) -> float:
         + int(minutes_text) * 60.0
         + float(seconds_text)
     )
+
+
+def ranged_progress(progress: float, start: float, end: float) -> float:
+    return start + (end - start) * min(max(progress, 0.0), 1.0)

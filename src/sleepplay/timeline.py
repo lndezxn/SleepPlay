@@ -13,6 +13,7 @@ class TimelineRecord:
 @dataclass(frozen=True)
 class Timeline:
     video: str
+    render_video: str
     frame_interval_seconds: float
     records: list[TimelineRecord]
 
@@ -28,6 +29,7 @@ def read_timeline(path: Path) -> Timeline:
     data = json.loads(path.read_text(encoding="utf-8"))
     return Timeline(
         video=str(data["video"]),
+        render_video=str(data["render_video"]),
         frame_interval_seconds=float(data["frame_interval_seconds"]),
         records=[
             TimelineRecord(

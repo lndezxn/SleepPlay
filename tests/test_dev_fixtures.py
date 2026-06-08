@@ -116,6 +116,7 @@ def test_write_pipeline_config_uses_shared_includes(tmp_path: Path) -> None:
     assert "configs/app/default.yaml" in config_text
     assert "configs/scores/frame_diff.yaml" in config_text
     assert "configs/speeds/sensitive.yaml" in config_text
+    assert "render_sources/fixture.mp4" in config_text
     assert "score:" not in config_text
     assert "speed:" not in config_text
 

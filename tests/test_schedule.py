@@ -11,6 +11,7 @@ from sleepplay.timeline import Timeline, TimelineRecord
 def test_build_replay_scale_uses_final_frame_interval() -> None:
     timeline = Timeline(
         video="input.mp4",
+        render_video="input.mp4",
         frame_interval_seconds=1.0,
         records=[
             TimelineRecord(time=0.0, score=1.0, replay_speed=2.0),
@@ -33,6 +34,7 @@ def test_build_replay_scale_uses_final_frame_interval() -> None:
 def test_source_and_replay_time_mapping_round_trips() -> None:
     timeline = Timeline(
         video="input.mp4",
+        render_video="input.mp4",
         frame_interval_seconds=1.0,
         records=[
             TimelineRecord(time=0.0, score=1.0, replay_speed=2.0),
@@ -51,6 +53,7 @@ def test_source_and_replay_time_mapping_round_trips() -> None:
 def test_build_replay_scale_uses_actual_output_frame_duration() -> None:
     timeline = Timeline(
         video="input.mp4",
+        render_video="input.mp4",
         frame_interval_seconds=1.0,
         records=[
             TimelineRecord(time=0.0, score=1.0, replay_speed=60.0),
@@ -67,6 +70,7 @@ def test_build_replay_scale_uses_actual_output_frame_duration() -> None:
 def test_replay_boundary_uses_next_segment() -> None:
     timeline = Timeline(
         video="input.mp4",
+        render_video="input.mp4",
         frame_interval_seconds=1.0,
         records=[
             TimelineRecord(time=0.0, score=1.0, replay_speed=2.0),

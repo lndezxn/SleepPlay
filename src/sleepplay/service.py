@@ -22,7 +22,8 @@ class ProcessingOverrides:
     analysis_width: int | None = None
     preprocess_fps: float | None = None
     preprocess_height: int | None = None
-    render_fps: float | None = None
+    render_source: str | None = None
+    render_source_fps: float | None = None
     score_type: str | None = None
     speed_type: str | None = None
     still_score: float | None = None
@@ -30,6 +31,7 @@ class ProcessingOverrides:
     min_speed: float | None = None
     max_speed: float | None = None
     sensitivity: float | None = None
+    pooling_window: int | None = None
     smoothing_window: int | None = None
 
 
@@ -75,6 +77,7 @@ def config_for_job(
         config.render,
         timeline_json=timeline_path,
         output_video=replay_path,
+        source_video=job_dir / "render_source.mp4",
     )
     score_config = config.score
     speed_config = config.speed
@@ -86,8 +89,10 @@ def config_for_job(
             preprocess_config = replace(preprocess_config, fps=overrides.preprocess_fps)
         if overrides.preprocess_height is not None:
             preprocess_config = replace(preprocess_config, height=overrides.preprocess_height)
-        if overrides.render_fps is not None:
-            render_config = replace(render_config, fps=overrides.render_fps)
+        if overrides.render_source is not None:
+            render_config = replace(render_config, source=overrides.render_source)
+        if overrides.render_source_fps is not None:
+            render_config = replace(render_config, source_fps=overrides.render_source_fps)
         score_config = override_score_config(score_config, overrides)
         speed_config = override_speed_config(speed_config, overrides)
 
@@ -138,6 +143,11 @@ def override_speed_config(
             overrides.sensitivity
             if overrides.sensitivity is not None
             else config.sensitivity
+        ),
+        pooling_window=(
+            overrides.pooling_window
+            if overrides.pooling_window is not None
+            else config.pooling_window
         ),
         smoothing_window=(
             overrides.smoothing_window

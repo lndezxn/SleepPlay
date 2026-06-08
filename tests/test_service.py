@@ -5,11 +5,11 @@ import cv2
 from config_helpers import write_runtime_config
 from sleepplay.config import load_config
 from sleepplay.progress import ProgressUpdate
-from sleepplay.service import config_for_job, process_replay
+from sleepplay.service import ProcessingOverrides, config_for_job, process_replay
 from video_helpers import write_test_video
 
 
-def test_config_for_job_only_overrides_runtime_paths(tmp_path: Path) -> None:
+def test_config_for_job_overrides_runtime_paths_and_requested_params(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     write_runtime_config(
         path=config_path,
@@ -20,15 +20,30 @@ def test_config_for_job_only_overrides_runtime_paths(tmp_path: Path) -> None:
     )
     config = load_config(config_path)
 
-    job_config = config_for_job(config, tmp_path / "jobs/1/input.mp4", tmp_path / "jobs/1")
+    job_config = config_for_job(
+        config,
+        tmp_path / "jobs/1/input.mp4",
+        tmp_path / "jobs/1",
+        ProcessingOverrides(
+            render_source="original",
+            render_source_fps=8.0,
+            pooling_window=7,
+        ),
+    )
 
     assert job_config.video.input == tmp_path / "jobs/1/input.mp4"
     assert job_config.preprocess.output == tmp_path / "jobs/1/preprocessed.mp4"
     assert job_config.output.json == tmp_path / "jobs/1/timeline.json"
     assert job_config.render.timeline_json == tmp_path / "jobs/1/timeline.json"
     assert job_config.render.output_video == tmp_path / "jobs/1/replay.mp4"
+    assert job_config.render.source == "original"
+    assert job_config.render.source_video == tmp_path / "jobs/1/render_source.mp4"
+    assert job_config.render.source_fps == 8.0
+    assert job_config.speed.pooling_window == 7
     assert job_config.score == config.score
-    assert job_config.speed == config.speed
+    assert job_config.speed.type == config.speed.type
+    assert job_config.speed.sensitivity == config.speed.sensitivity
+    assert job_config.speed.smoothing_window == config.speed.smoothing_window
     assert job_config.web == config.web
 
 

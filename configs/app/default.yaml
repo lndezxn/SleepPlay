@@ -19,7 +19,9 @@ output:
 render:
   timeline_json: output/timeline.json
   output_video: output/replay.mp4
-  fps: 30.0
+  source: preprocessed
+  source_video: output/render_source.mp4
+  source_fps: 15.0
   video_codec: libx264
   quality: 7
   overlay:
