@@ -14,7 +14,7 @@ Requirements:
 Set up the project:
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/lndezxn/SleepPlay.git
 cd SleepPlay
 uv sync
 ```
